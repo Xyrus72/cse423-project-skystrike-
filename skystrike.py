@@ -407,6 +407,32 @@ class Projectile:
 
 
 
+
+game = None
+
+def display():
+    game.render()
+
+def idle():
+    current_time = time.time()
+    dt = current_time - game.last_time
+    game.last_time = current_time
+    
+    # Handle continuous machine gun firing
+    if game.state == GameState.PLAYING and game.mouse_left:
+        proj = game.player.fire_machine_gun()
+        if proj:
+            game.projectiles.append(proj)
+            game.shots_fired += 1
+    
+    game.update(dt)
+    glutPostRedisplay()
+
+def reshape(w, h):
+    glViewport(0, 0, w, h)
+
+
+
 def keyboard(key, x, y):
     k = key.decode('utf-8').lower()
     
