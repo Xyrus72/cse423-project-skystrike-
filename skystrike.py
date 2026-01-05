@@ -1,3 +1,47 @@
+"""
+SkyStrike - 3D Aerial Combat Simulation
+A comprehensive aerial combat game featuring intelligent AI, multi-camera systems,
+advanced weapon mechanics, and progressive difficulty.
+"""
+
+from OpenGL.GL import *
+from OpenGL.GLU import *
+from OpenGL.GLUT import *
+import sys
+import random
+import time
+import math
+
+# ============================================================================
+# CONSTANTS AND CONFIGURATION
+# ============================================================================
+
+WIN_W, WIN_H = 1280, 720
+GAME_TITLE = b"SkyStrike - Aerial Combat Simulation"
+
+# Game boundaries
+WORLD_SIZE = 500
+WORLD_HEIGHT_MIN = 0
+WORLD_HEIGHT_MAX = 400
+
+# Player constants
+PLAYER_SPEED = 80.0
+PLAYER_TURN_SPEED = 2.0
+PLAYER_MAX_HEALTH = 100
+PLAYER_MACHINE_GUN_COOLDOWN = 0.08
+PLAYER_MISSILE_COOLDOWN = 1.5
+
+# Enemy constants
+ENEMY_SPAWN_INTERVAL = 3.0
+MAX_ENEMIES = 15
+
+# Difficulty scaling
+DIFFICULTY_SCALE_RATE = 0.05
+
+# ============================================================================
+# UTILITY CLASSES
+# ============================================================================
+
 class Vector3:
     """3D vector math operations"""
     def __init__(self, x=0, y=0, z=0):
