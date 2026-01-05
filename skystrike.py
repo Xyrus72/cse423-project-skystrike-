@@ -408,6 +408,137 @@ class Projectile:
 
 
 
+class EnemyState:
+    PATROL = 0
+    CHASE = 1
+    ATTACK = 2
+    EVADE = 3
+    DESTROYED = 4
+
+class Enemy:
+    """Enemy aircraft with AI"""
+    def __init__(self, enemy_type="scout"):
+        self.type = enemy_type
+        self.position = Vector3(
+            random.choice([-WORLD_SIZE, WORLD_SIZE]) * random.uniform(0.5, 1.0),
+            random.uniform(50, 300),
+            random.choice([-WORLD_SIZE, WORLD_SIZE]) * random.uniform(0.5, 1.0)
+        )
+        self.velocity = Vector3(0, 0, 0)
+        self.rotation = random.uniform(0, 360)
+        self.state = EnemyState.PATROL
+        self.alive = True
+        
+        # Type-specific attributes
+        if enemy_type == "scout":
+            self.max_health = 30
+            self.speed = 60
+            self.size = 8
+            self.color = (0.3, 0.8, 1.0)
+            self.fire_cooldown_max = 2.0
+            self.damage = 5
+        elif enemy_type == "jet":
+            self.max_health = 60
+            self.speed = 45
+            self.size = 10
+            self.color = (1.0, 0.3, 0.3)
+            self.fire_cooldown_max = 1.0
+            self.damage = 10
+        else:  # bomber
+            self.max_health = 100
+            self.speed = 30
+            self.size = 15
+            self.color = (0.5, 0.5, 0.5)
+            self.fire_cooldown_max = 1.5
+            self.damage = 15
+        
+        self.health = self.max_health
+        self.fire_cooldown = 0
+        self.patrol_target = self._new_patrol_target()
+        self.state_timer = 0
+    
+    def _new_patrol_target(self):
+        return Vector3(
+            random.uniform(-WORLD_SIZE * 0.8, WORLD_SIZE * 0.8),
+            random.uniform(50, 300),
+            random.uniform(-WORLD_SIZE * 0.8, WORLD_SIZE * 0.8)
+        )
+    
+    def update(self, dt, player_pos, difficulty_multiplier):
+        if not self.alive:
+            return None
+        
+        self.fire_cooldown = max(0, self.fire_cooldown - dt)
+        self.state_timer += dt
+        
+        dist_to_player = self.position.distance_to(player_pos)
+        
+        # State transitions
+        if self.health < self.max_health * 0.3:
+            self.state = EnemyState.EVADE
+        elif dist_to_player < 100:
+            self.state = EnemyState.ATTACK
+        elif dist_to_player < 200:
+            self.state = EnemyState.CHASE
+        else:
+            self.state = EnemyState.PATROL
+        
+        # Behavior based on state
+        target_pos = None
+        
+        if self.state == EnemyState.PATROL:
+            if self.position.distance_to(self.patrol_target) < 20:
+                self.patrol_target = self._new_patrol_target()
+            target_pos = self.patrol_target
+        
+        elif self.state == EnemyState.CHASE:
+            target_pos = player_pos
+        
+        elif self.state == EnemyState.ATTACK:
+            # Circle around player
+            angle = self.state_timer
+            offset = Vector3(math.cos(angle) * 80, 0, math.sin(angle) * 80)
+            target_pos = player_pos + offset
+        
+        elif self.state == EnemyState.EVADE:
+            # Move away from player
+            away = (self.position - player_pos).normalize()
+            target_pos = self.position + away * 100
+        
+        # Move toward target
+        if target_pos:
+            direction = (target_pos - self.position).normalize()
+            speed = self.speed * difficulty_multiplier
+            self.velocity = direction * speed
+            self.position = self.position + self.velocity * dt
+            
+            # Update rotation to face direction
+            if direction.length() > 0:
+                self.rotation = math.degrees(math.atan2(direction.x, direction.z))
+        
+        # Constrain to world bounds
+        self.position.x = max(-WORLD_SIZE, min(WORLD_SIZE, self.position.x))
+        self.position.y = max(WORLD_HEIGHT_MIN + 20, min(WORLD_HEIGHT_MAX - 20, self.position.y))
+        self.position.z = max(-WORLD_SIZE, min(WORLD_SIZE, self.position.z))
+        
+        # Fire at player
+        if self.state == EnemyState.ATTACK and self.fire_cooldown == 0:
+            self.fire_cooldown = self.fire_cooldown_max / difficulty_multiplier
+            # Predict player position
+            to_player = (player_pos - self.position).normalize()
+            return Projectile(self.position, to_player, 100, self.damage, False, "enemy")
+        
+        return None
+    
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            self.alive = False
+            return True
+        return False
+
+
+
 game = None
 
 def display():
