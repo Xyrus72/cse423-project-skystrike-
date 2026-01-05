@@ -598,7 +598,250 @@ class Enemy:
         glPopMatrix()
 
 
-
+class PlayerAircraft:
+    """Player-controlled aircraft"""
+    def __init__(self):
+        self.position = Vector3(0, 100, 0)
+        self.rotation = 0  # Yaw
+        self.pitch = 0
+        self.bank = 0  # Visual roll
+        self.velocity = Vector3(0, 0, 0)
+        self.health = PLAYER_MAX_HEALTH
+        self.max_health = PLAYER_MAX_HEALTH
+        self.alive = True
+        
+        self.machine_gun_cooldown = 0
+        self.missile_cooldown = 0
+        self.missiles = 10
+        
+        # Input state
+        self.input_forward = False
+        self.input_backward = False
+        self.input_left = False
+        self.input_right = False
+        self.input_up = False
+        self.input_down = False
+    
+    def update(self, dt):
+        # Handle rotation
+        turn_amount = PLAYER_TURN_SPEED * dt
+        if self.input_left:
+            self.rotation += turn_amount * 50
+            self.bank = min(30, self.bank + 100 * dt)
+        elif self.input_right:
+            self.rotation -= turn_amount * 50
+            self.bank = max(-30, self.bank - 100 * dt)
+        else:
+            # Return to level
+            self.bank *= 0.9
+        
+        # Handle altitude
+        if self.input_up:
+            self.pitch = min(30, self.pitch + 50 * dt)
+        elif self.input_down:
+            self.pitch = max(-30, self.pitch - 50 * dt)
+        else:
+            self.pitch *= 0.9
+        
+        # Calculate forward direction
+        rad_yaw = math.radians(self.rotation)
+        rad_pitch = math.radians(self.pitch)
+        
+        forward = Vector3(
+            math.sin(rad_yaw),
+            math.sin(rad_pitch),
+            math.cos(rad_yaw)
+        ).normalize()
+        
+        # Move forward continuously
+        self.velocity = forward * PLAYER_SPEED
+        self.position = self.position + self.velocity * dt
+        
+        # Constrain to world bounds
+        self.position.x = max(-WORLD_SIZE + 10, min(WORLD_SIZE - 10, self.position.x))
+        self.position.y = max(WORLD_HEIGHT_MIN + 10, min(WORLD_HEIGHT_MAX - 10, self.position.y))
+        self.position.z = max(-WORLD_SIZE + 10, min(WORLD_SIZE - 10, self.position.z))
+        
+        # Update cooldowns
+        self.machine_gun_cooldown = max(0, self.machine_gun_cooldown - dt)
+        self.missile_cooldown = max(0, self.missile_cooldown - dt)
+    
+    def get_forward_direction(self):
+        rad_yaw = math.radians(self.rotation)
+        rad_pitch = math.radians(self.pitch)
+        return Vector3(
+            math.sin(rad_yaw),
+            math.sin(rad_pitch),
+            math.cos(rad_yaw)
+        ).normalize()
+    
+    def get_aiming_point(self):
+        """Get the 3D aiming point in front of and above the aircraft"""
+        forward = self.get_forward_direction()
+        # Aiming point is 80 units ahead and slightly up from the aircraft
+        aiming_distance = 80
+        aiming_point = self.position + forward * aiming_distance
+        aiming_point.y += 3  # Slightly above for better aiming
+        return aiming_point
+    
+    def fire_machine_gun(self):
+        if self.machine_gun_cooldown == 0:
+            self.machine_gun_cooldown = PLAYER_MACHINE_GUN_COOLDOWN
+            # Fire from front of the plane nose
+            forward = self.get_forward_direction()
+            spawn_offset = forward * 12  # 12 units in front
+            spawn_offset.y -= 2  # Slightly below center (gun position)
+            spawn_pos = self.position + spawn_offset
+            
+            # Fire toward aiming point
+            aiming_point = self.get_aiming_point()
+            direction = (aiming_point - spawn_pos).normalize()
+            return Projectile(spawn_pos, direction, 200, 10, False, "player")
+        return None
+    
+    def fire_missile(self):
+        if self.missile_cooldown == 0 and self.missiles > 0:
+            self.missile_cooldown = PLAYER_MISSILE_COOLDOWN
+            self.missiles -= 1
+            # Fire from front of the plane nose
+            forward = self.get_forward_direction()
+            spawn_offset = forward * 12  # 12 units in front
+            spawn_offset.y -= 2  # Slightly below center (missile launcher position)
+            spawn_pos = self.position + spawn_offset
+            
+            # Fire toward aiming point
+            aiming_point = self.get_aiming_point()
+            direction = (aiming_point - spawn_pos).normalize()
+            return Projectile(spawn_pos, direction, 250, 40, True, "player")
+        return None
+    
+    def take_damage(self, damage):
+        self.health -= damage
+        if self.health <= 0:
+            self.health = 0
+            self.alive = False
+    
+    def render(self):
+        glPushMatrix()
+        glTranslatef(self.position.x, self.position.y, self.position.z)
+        glRotatef(self.rotation, 0, 1, 0)
+        glRotatef(self.pitch, 1, 0, 0)
+        glRotatef(self.bank, 0, 0, 1)
+        
+        # Main Fuselage
+        glColor3f(0.2, 0.6, 0.9)
+        glPushMatrix()
+        glScalef(4, 2.5, 15)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Nose cone (front)
+        glColor3f(0.15, 0.5, 0.8)
+        glPushMatrix()
+        glTranslatef(0, 0, 8)
+        glRotatef(-90, 1, 0, 0)
+        glutSolidCone(2, 3, 8, 1)
+        glPopMatrix()
+        
+        # Cockpit canopy
+        glColor3f(0.3, 0.7, 0.9)
+        glPushMatrix()
+        glTranslatef(0, 2.5, 3)
+        glScalef(2.5, 2, 5)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Cockpit glass (darker)
+        glColor3f(0.1, 0.2, 0.3)
+        glPushMatrix()
+        glTranslatef(0, 3, 3)
+        glScalef(2, 1, 4)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Main Wings
+        glColor3f(0.15, 0.5, 0.8)
+        glPushMatrix()
+        glScalef(25, 0.8, 6)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Wing tips (angled)
+        glColor3f(0.1, 0.4, 0.7)
+        glPushMatrix()
+        glTranslatef(13, 0, 0)
+        glRotatef(10, 0, 0, 1)
+        glScalef(4, 0.6, 3)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        glPushMatrix()
+        glTranslatef(-13, 0, 0)
+        glRotatef(-10, 0, 0, 1)
+        glScalef(4, 0.6, 3)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Tail wings (horizontal stabilizers)
+        glPushMatrix()
+        glTranslatef(0, 0, -7)
+        glScalef(10, 0.6, 3)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Vertical stabilizer (tail fin)
+        glPushMatrix()
+        glTranslatef(0, 3, -7)
+        glScalef(0.6, 6, 3)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Engine nacelles (housings)
+        glColor3f(0.25, 0.25, 0.3)
+        glPushMatrix()
+        glTranslatef(5, -1, -2)
+        glScalef(2, 2, 8)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        glPushMatrix()
+        glTranslatef(-5, -1, -2)
+        glScalef(2, 2, 8)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Engine nozzles
+        glColor3f(0.3, 0.3, 0.4)
+        quad = gluNewQuadric()
+        
+        glPushMatrix()
+        glTranslatef(5, -1, -7)
+        glRotatef(90, 0, 1, 0)
+        gluCylinder(quad, 1.5, 1.8, 2, 12, 1)
+        glPopMatrix()
+        
+        glPushMatrix()
+        glTranslatef(-5, -1, -7)
+        glRotatef(90, 0, 1, 0)
+        gluCylinder(quad, 1.5, 1.8, 2, 12, 1)
+        glPopMatrix()
+        
+        # Afterburner glow (when moving)
+        if self.velocity.length() > 10:
+            glColor3f(1.0, 0.5, 0.0)
+            glPushMatrix()
+            glTranslatef(5, -1, -9)
+            glutSolidSphere(1, 8, 8)
+            glPopMatrix()
+            
+            glPushMatrix()
+            glTranslatef(-5, -1, -9)
+            glutSolidSphere(1, 8, 8)
+            glPopMatrix()
+        
+        gluDeleteQuadric(quad)
+        
+        glPopMatrix()
 
 
 
