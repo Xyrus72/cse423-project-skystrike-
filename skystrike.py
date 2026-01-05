@@ -536,6 +536,80 @@ class Enemy:
             self.alive = False
             return True
         return False
+    
+    def render(self):
+        if not self.alive:
+            return
+        
+        glPushMatrix()
+        glTranslatef(self.position.x, self.position.y, self.position.z)
+        glRotatef(self.rotation, 0, 1, 0)
+        
+        # Fuselage
+        glColor3f(*self.color)
+        glPushMatrix()
+        glScalef(3, 2, self.size)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Wings
+        glColor3f(self.color[0] * 0.8, self.color[1] * 0.8, self.color[2] * 0.8)
+        glPushMatrix()
+        glTranslatef(0, 0, 0)
+        glScalef(self.size * 1.5, 0.5, 4)
+        glutSolidCube(1)
+        glPopMatrix()
+        
+        # Engines
+        glColor3f(0.3, 0.3, 0.3)
+        quad = gluNewQuadric()
+        glPushMatrix()
+        glTranslatef(3, -1, -self.size * 0.4)
+        glRotatef(90, 0, 1, 0)
+        gluCylinder(quad, 1, 1, 2, 8, 1)
+        glPopMatrix()
+        
+        glPushMatrix()
+        glTranslatef(-3, -1, -self.size * 0.4)
+        glRotatef(90, 0, 1, 0)
+        gluCylinder(quad, 1, 1, 2, 8, 1)
+        glPopMatrix()
+        gluDeleteQuadric(quad)
+        
+        # Health bar
+        glPushMatrix()
+        glTranslatef(0, self.size + 5, 0)
+        glRotatef(-self.rotation, 0, 1, 0)
+        health_percent = self.health / self.max_health
+        if health_percent > 0.6:
+            glColor3f(0, 1, 0)
+        elif health_percent > 0.3:
+            glColor3f(1, 1, 0)
+        else:
+            glColor3f(1, 0, 0)
+        glBegin(GL_QUADS)
+        glVertex3f(-5, 0, 0)
+        glVertex3f(-5 + 10 * health_percent, 0, 0)
+        glVertex3f(-5 + 10 * health_percent, 1, 0)
+        glVertex3f(-5, 1, 0)
+        glEnd()
+        glPopMatrix()
+        
+        glPopMatrix()
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
